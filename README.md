@@ -1,103 +1,102 @@
-# XSLT Injection Exploit Script
+# Exploit Automation Script for Umbraco CMS XSLT Injection
 
-This Bash script demonstrates an XSLT injection attack targeting a vulnerable endpoint in an Umbraco CMS instance. It uses crafted payloads to execute arbitrary commands on the target system.
+This repository contains a Bash script to exploit an XSLT injection vulnerability in Umbraco CMS. The script automates the process of authentication, payload delivery, and command execution, extracting and displaying the results.
 
----
+## Features
 
-## **Features**
-- **Authentication:** Logs in to the target system using supplied credentials.
-- **Token Extraction:** Fetches and utilizes necessary CSRF and view state tokens dynamically.
-- **Payload Delivery:** Injects a malicious XSLT payload for command execution.
-- **Debugging Support:** Saves HTTP responses to debug files for troubleshooting.
-
----
-
-## **Requirements**
-- **System Requirements:**
-  - `curl`: For making HTTP requests.
-  - `grep`: For parsing responses.
-  - `tr`: For handling cookies.
-- **Target:** A vulnerable instance of Umbraco CMS.
-- **Credentials:** Valid username and password for the target system.
+- Logs in to the target Umbraco CMS instance using provided credentials.
+- Delivers an XSLT payload for remote command execution.
+- Extracts and displays the output of the executed command.
+- Saves debugging information for failed attempts.
 
 ---
 
-## **Usage**
+## Usage
 
-### **1. Script Syntax**
-```sh
-./exploit.sh <username> <password> <target_url> <full_command>
+### Syntax
+
+```bash
+./Umbrac-CMS-XSLT-RCE <username> <password> <target_url> <full_command>
 ```
 
-### **2. Parameters**
-- `<username>`: The username for authentication.
-- `<password>`: The password for authentication.
-- `<target_url>`: The base URL of the target system.
-- `<full_command>`: The command to execute on the target system.
+### Example
 
-### **3. Example**
-```sh
-./exploit.sh admin@htb.local baconandcheese http://remote.htb/ "whoami"
+```bash
+./Umbrac-CMS-XSLT-RCE admin@htb.local password123 http://example.com "systeminfo"
 ```
 
 ---
 
-## **How It Works**
+## Prerequisites
 
-1. **Authentication:**
-   - Sends a login request to the `/umbraco/backoffice/UmbracoApi/Authentication/PostLogin` endpoint.
-   - Extracts cookies and CSRF tokens from the response.
+The script requires the following tools:
+- `curl`: For sending HTTP requests.
+- `awk`: For processing text output.
+- `sed`: For text substitution and HTML parsing.
+- `grep`: For regex-based content extraction.
+- `tr`: For character filtering and formatting.
 
-2. **Fetching Tokens:**
-   - Accesses the `/umbraco/developer/Xslt/xsltVisualize.aspx` page to retrieve `VIEWSTATE` and `VIEWSTATEGENERATOR` tokens.
+If any of these tools are not available, the script will automatically attempt to install them.
 
-3. **Payload Delivery:**
-   - Constructs an XSLT payload with the command specified by the user.
-   - Sends the payload to the target using the tokens and cookies from previous steps.
+### Automatic Installation of Dependencies
 
-4. **Debugging:**
-   - Saves responses to:
-     - `debug_login_response.txt`: For debugging login issues.
-     - `debug_xslt_response.html`: For debugging token retrieval issues.
-     - `debug_attack_response.html`: For debugging payload delivery issues.
+The script includes a function to check and install missing dependencies. You can run the script, and it will prompt you to install any missing tools.
 
 ---
 
-## **File Descriptions**
-- `exploit.sh`: The main script.
-- `debug_login_response.txt`: Stores the login HTTP response headers for debugging.
-- `debug_xslt_response.html`: Stores the response from the XSLT visualization page for debugging.
-- `debug_attack_response.html`: Stores the response after payload delivery for debugging.
+## Installation
 
----
+Clone this repository to your system:
 
-## **Sample Output**
-```sh
-[*] Step 1 - Logging in...
-[+] Login successful!
+```bash
+git clone https://github.com/0xDTC/Umbraco-CMS-7.12.4-Authenticated-RCE.git
+cd Umbraco-CMS-7.12.4-Authenticated-RCE
+```
 
-[*] Step 2 - Accessing XSLT Visualize page...
-[+] Successfully fetched tokens.
+Make the script executable:
 
-[*] Step 3 - Sending malicious payload...
-[+] Payload executed successfully. Check the target!
-
-[*] Exploit completed.
+```bash
+chmod +x Umbrac-CMS-XSLT-RCE
 ```
 
 ---
 
-## **Troubleshooting**
-1. **Login Issues:**
-   - Check `debug_login_response.txt` for response headers.
-   - Verify the provided username and password.
+## Dependencies Check and Installation
 
-2. **Token Retrieval Issues:**
-   - Check `debug_xslt_response.html` for valid `VIEWSTATE` and `VIEWSTATEGENERATOR` tokens.
+The script includes an automatic dependency installation mechanism. If any required tools are not found on the system, the script will attempt to install them using `apt`.
 
-3. **Payload Delivery Issues:**
-   - Review `debug_attack_response.html` for error details.
+```bash
+# Dependency installation function
+install_dependencies() {
+    echo "[*] Checking and installing required dependencies..."
+    for tool in curl awk sed grep tr; do
+        if ! command -v $tool &> /dev/null; then
+            echo "[!] $tool not found. Installing..."
+            sudo apt update && sudo apt install -y $tool
+        else
+            echo "[+] $tool is already installed."
+        fi
+    done
+}
+```
+
+This function will run before executing the main script logic.
+
 ---
 
-## **Disclaimer**
-This script is for **educational purposes only**. Unauthorized use against systems without explicit permission is illegal. Use this script responsibly.
+## Debugging
+
+If the exploit fails, the script saves the full server response to `debug_attack_response.html`. Review this file to identify potential issues with the payload or server response.
+
+---
+
+## Disclaimer
+
+**This script is intended for educational purposes only.** Unauthorized use of this script against systems without explicit permission is illegal and unethical. The authors are not responsible for any misuse or damage caused by this script.
+
+---
+
+
+### Contributions
+
+Feel free to contribute improvements or report issues via GitHub Pull Requests or Issues.
